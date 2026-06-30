@@ -1,0 +1,270 @@
+package com.example.ui
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.Difficulty
+import kotlin.math.atan2
+
+@Composable
+fun GameScreen(
+    viewModel: GameViewModel,
+    onLeaderboardClick: () -> Unit,
+    onWin: (Int) -> Unit
+) {
+    val gameState by viewModel.gameState.collectAsState()
+    val message by viewModel.message.collectAsState()
+    val currentDifficulty by viewModel.currentDifficulty.collectAsState()
+    val submissionResult by viewModel.submissionResult.collectAsState()
+    
+    // Add logic to clear message after a delay
+    LaunchedEffect(message) {
+        if (message != null) {
+            kotlinx.coroutines.delay(2000)
+            viewModel.clearMessage()
+        }
+    }
+    
+    LaunchedEffect(submissionResult) {
+        if (submissionResult != null) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearSubmissionResult()
+        }
+    }
+
+    if (gameState == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    val state = gameState!!
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header (Streak and Difficulty)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "STREAK",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(
+                    text = "${state.streak}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            IconButton(onClick = onLeaderboardClick) {
+                Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard", tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Text(
+            text = "TARGET",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            letterSpacing = 2.sp
+        )
+        Text(
+            text = "${state.targetValue}",
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Black
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+            Difficulty.values().forEach { diff ->
+                TextButton(
+                    onClick = { viewModel.setDifficulty(diff) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (currentDifficulty == diff) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Text(diff.name)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Minimalist Dial
+        var lastAngle by remember { mutableStateOf<Float?>(null) }
+
+        Box(
+            modifier = Modifier
+                .size(250.dp)
+                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val angleRad = atan2(offset.y - center.y, offset.x - center.x)
+                            lastAngle = Math.toDegrees(angleRad.toDouble()).toFloat()
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val pos = change.position
+                            val angleRad = atan2(pos.y - center.y, pos.x - center.x)
+                            val angleDeg = Math.toDegrees(angleRad.toDouble()).toFloat()
+                            
+                            val last = lastAngle
+                            if (last != null) {
+                                var delta = angleDeg - last
+                                if (delta > 180) delta -= 360
+                                if (delta < -180) delta += 360
+                                viewModel.updateAngle(delta)
+                            }
+                            lastAngle = angleDeg
+                        },
+                        onDragEnd = { lastAngle = null },
+                        onDragCancel = { lastAngle = null }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            val indicatorColor = MaterialTheme.colorScheme.primary
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val radius = size.width / 2 - 20.dp.toPx()
+                
+                // Track
+                drawCircle(
+                    color = Color.DarkGray,
+                    radius = radius,
+                    style = Stroke(width = 4.dp.toPx())
+                )
+                
+                // Indicator line based on angle
+                val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
+                val startX = center.x + (radius - 15.dp.toPx()) * Math.cos(angleRad).toFloat()
+                val startY = center.y + (radius - 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
+                val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                
+                drawLine(
+                    color = indicatorColor,
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 6.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "Attempts: ${state.attempts}",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (submissionResult != null) {
+            val result = submissionResult!!
+            var animationPlayed by remember { mutableStateOf(false) }
+            
+            LaunchedEffect(result) {
+                animationPlayed = true
+            }
+
+            val maxSpins = maxOf(result.targetSpins, result.submittedSpins).toFloat()
+            val targetRatio = if (maxSpins > 0) result.targetSpins / maxSpins else 0f
+            val submittedRatio = if (maxSpins > 0) result.submittedSpins / maxSpins else 0f
+            
+            val animatedSubmittedRatio by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (animationPlayed) submittedRatio else 0f,
+                animationSpec = androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+            )
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)) {
+                Text(
+                    text = "Spins: ${result.submittedSpins} / ${result.targetSpins}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(16.dp)) {
+                    // Background
+                    Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray, CircleShape))
+                    
+                    // Submitted Bar
+                    Box(modifier = Modifier.fillMaxWidth(animatedSubmittedRatio).fillMaxHeight().background(
+                        if (result.isWin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        CircleShape
+                    ))
+                    
+                    // Target Marker
+                    Box(modifier = Modifier.fillMaxWidth(targetRatio).fillMaxHeight(), contentAlignment = Alignment.CenterEnd) {
+                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(Color.White))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        
+        if (message != null) {
+            Text(
+                text = message!!,
+                color = if (message == "Perfect!") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { viewModel.submit(onWin = onWin, onFail = {}) },
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("SUBMIT", fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+        }
+    }
+}
