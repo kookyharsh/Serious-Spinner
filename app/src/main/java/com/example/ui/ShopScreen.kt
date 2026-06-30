@@ -177,8 +177,8 @@ fun MinimalistDialPreview(modifier: Modifier) {
         )
         
         val angleRad = Math.toRadians((45 - 90).toDouble())
-        val startX = center.x + (radius - 8.dp.toPx()) * Math.cos(angleRad).toFloat()
-        val startY = center.y + (radius - 8.dp.toPx()) * Math.sin(angleRad).toFloat()
+        val startX = center.x + (radius - 16.dp.toPx()) * Math.cos(angleRad).toFloat()
+        val startY = center.y + (radius - 16.dp.toPx()) * Math.sin(angleRad).toFloat()
         val endX = center.x + (radius + 8.dp.toPx()) * Math.cos(angleRad).toFloat()
         val endY = center.y + (radius + 8.dp.toPx()) * Math.sin(angleRad).toFloat()
         

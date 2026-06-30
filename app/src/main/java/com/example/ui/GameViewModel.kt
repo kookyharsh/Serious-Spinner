@@ -39,6 +39,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val currentDifficulty = MutableStateFlow(Difficulty.NORMAL)
     val message = MutableStateFlow<String?>(null)
     val submissionResult = MutableStateFlow<SubmissionResult?>(null)
+    
+    val hapticsEnabled: StateFlow<Boolean> = prefs.hapticsEnabled.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        true
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val gameState: StateFlow<GameState?> = currentDifficulty
@@ -115,16 +121,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 
                 // Add points
                 val difficultyMultiplier = when (diff) {
-                    Difficulty.EASY -> 1
-                    Difficulty.NORMAL -> 2
-                    Difficulty.HARD -> 3
-                    Difficulty.EXTREME -> 5
+                    Difficulty.EASY -> 0.10f
+                    Difficulty.NORMAL -> 0.20f
+                    Difficulty.HARD -> 0.30f
+                    Difficulty.EXTREME -> 0.50f
                 }
-                val earnedPoints = maxOf(0, state.targetValue + state.level - state.attempts) * (1 + state.streak) * difficultyMultiplier
-                prefs.addPoints(earnedPoints)
+                val earnedPoints = (maxOf(0, state.targetValue + state.level - state.attempts) * (1f + state.streak * difficultyMultiplier)).toInt()
+                if (earnedPoints > 0) prefs.addPoints(earnedPoints)
 
                 vibrate(getApplication(), true)
-                message.value = "Perfect! +$earnedPoints points"
+                message.value = "Perfect!" + if (earnedPoints > 0) " +$earnedPoints points" else ""
                 onWin(newStreak)
             } else {
                 // Fail
@@ -143,6 +149,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun triggerTickHaptic() {
+        if (!hapticsEnabled.value) return
         val vibrator = getApplication<Application>().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
@@ -152,6 +159,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun vibrate(context: Context, success: Boolean) {
+        if (!hapticsEnabled.value) return
         val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             if (success) {

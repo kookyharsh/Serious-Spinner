@@ -30,6 +30,7 @@ fun GameScreen(
     viewModel: GameViewModel,
     onLeaderboardClick: () -> Unit,
     onShopClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onWin: (Int) -> Unit
 ) {
     val gameState by viewModel.gameState.collectAsState()
@@ -119,6 +120,9 @@ fun GameScreen(
             }
             
             Row {
+                IconButton(onClick = onSettingsClick) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                }
                 IconButton(onClick = onShopClick) {
                     Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = MaterialTheme.colorScheme.primary)
                 }
@@ -220,8 +224,8 @@ fun GameScreen(
                     
                     // Indicator line based on angle
                     val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
-                    val startX = center.x + (radius - 15.dp.toPx()) * Math.cos(angleRad).toFloat()
-                    val startY = center.y + (radius - 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                    val startX = center.x + (radius - 30.dp.toPx()) * Math.cos(angleRad).toFloat()
+                    val startY = center.y + (radius - 30.dp.toPx()) * Math.sin(angleRad).toFloat()
                     val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
                     val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
                     

@@ -31,10 +31,18 @@ class MainActivity : ComponentActivity() {
         playGamesManager.unlockAchievement(this, "CgkI_mock_daily_login_id")
 
         setContent {
-            MyApplicationTheme {
+            val viewModel: GameViewModel = viewModel()
+            val themeMode by viewModel.prefs.themeMode.collectAsState(initial = 0)
+            
+            val darkTheme = when (themeMode) {
+                1 -> false
+                2 -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            MyApplicationTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
-                    val viewModel: GameViewModel = viewModel()
                     val onboardingCompleted by viewModel.prefs.onboardingCompleted.collectAsState(initial = false)
 
                     NavHost(
@@ -60,6 +68,9 @@ class MainActivity : ComponentActivity() {
                                 onShopClick = {
                                     navController.navigate("shop")
                                 },
+                                onSettingsClick = {
+                                    navController.navigate("settings")
+                                },
                                 onWin = { streak ->
                                     playGamesManager.submitScore(this@MainActivity, "CgkI_mock_leaderboard_id", streak.toLong())
                                     if (streak == 5) playGamesManager.unlockAchievement(this@MainActivity, "CgkI_mock_achievement_5")
@@ -69,6 +80,12 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("shop") {
                             com.example.ui.ShopScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("settings") {
+                            com.example.ui.SettingsScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() }
                             )

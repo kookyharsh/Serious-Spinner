@@ -71,7 +71,7 @@ fun BlueDial(angle: Float, modifier: Modifier) {
         rotate(angle, center) {
             val notchCenter = center.copy(y = center.y - radius * 0.7f)
             val notchWidth = 8.dp.toPx()
-            val notchHeight = 16.dp.toPx()
+            val notchHeight = 32.dp.toPx()
             val notchRect = Rect(
                 notchCenter.x - notchWidth / 2f,
                 notchCenter.y - notchHeight / 2f,

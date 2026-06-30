@@ -17,6 +17,8 @@ class PreferencesManager(private val context: Context) {
     private val POINTS = intPreferencesKey("points")
     private val UNLOCKED_SPINNERS = stringSetPreferencesKey("unlocked_spinners")
     private val CURRENT_SPINNER = stringPreferencesKey("current_spinner")
+    private val THEME_MODE = intPreferencesKey("theme_mode")
+    private val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
 
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[ONBOARDING_COMPLETED] ?: false
@@ -32,6 +34,14 @@ class PreferencesManager(private val context: Context) {
     
     val currentSpinner: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[CURRENT_SPINNER] ?: "DEFAULT"
+    }
+
+    val themeMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[THEME_MODE] ?: 0
+    }
+
+    val hapticsEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[HAPTICS_ENABLED] ?: true
     }
 
     suspend fun setOnboardingCompleted() {
@@ -67,6 +77,18 @@ class PreferencesManager(private val context: Context) {
             if (unlocked.contains(id)) {
                 prefs[CURRENT_SPINNER] = id
             }
+        }
+    }
+
+    suspend fun setThemeMode(mode: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[THEME_MODE] = mode
+        }
+    }
+
+    suspend fun setHapticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[HAPTICS_ENABLED] = enabled
         }
     }
 }
