@@ -15,6 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -167,10 +170,11 @@ fun GameScreen(
         // Minimalist Dial
         var lastAngle by remember { mutableStateOf<Float?>(null) }
 
+        val spinnerConfig = com.example.data.SpinnerProvider.getSpinner(currentSpinner)
         Box(
             modifier = Modifier
                 .size(250.dp)
-                .background(if (currentSpinner == "DEFAULT") Color.Transparent else MaterialTheme.colorScheme.surface, CircleShape)
+                .background(if (spinnerConfig.isCanvasBased && currentSpinner != "DEFAULT") MaterialTheme.colorScheme.surface else Color.Transparent, CircleShape)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -208,33 +212,50 @@ fun GameScreen(
                 },
             contentAlignment = Alignment.Center
         ) {
-            if (currentSpinner == "DEFAULT") {
-                BlueDial(angle = state.currentAngle, modifier = Modifier.fillMaxSize())
+            if (spinnerConfig.isCanvasBased) {
+                if (currentSpinner == "DEFAULT") {
+                    BlueDial(angle = state.currentAngle, modifier = Modifier.fillMaxSize())
+                } else {
+                    val indicatorColor = MaterialTheme.colorScheme.primary
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val radius = size.width / 2 - 20.dp.toPx()
+                        
+                        // Track
+                        drawCircle(
+                            color = Color.DarkGray,
+                            radius = radius,
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                        
+                        // Indicator line based on angle
+                        val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
+                        val startX = center.x + (radius - 30.dp.toPx()) * Math.cos(angleRad).toFloat()
+                        val startY = center.y + (radius - 30.dp.toPx()) * Math.sin(angleRad).toFloat()
+                        val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
+                        val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                        
+                        drawLine(
+                            color = indicatorColor,
+                            start = Offset(startX, startY),
+                            end = Offset(endX, endY),
+                            strokeWidth = 6.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
             } else {
-                val indicatorColor = MaterialTheme.colorScheme.primary
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val radius = size.width / 2 - 20.dp.toPx()
-                    
-                    // Track
-                    drawCircle(
-                        color = Color.DarkGray,
-                        radius = radius,
-                        style = Stroke(width = 4.dp.toPx())
+                spinnerConfig.shellResId?.let { resId ->
+                    Image(
+                        painter = painterResource(id = resId),
+                        contentDescription = "Shell",
+                        modifier = Modifier.fillMaxSize()
                     )
-                    
-                    // Indicator line based on angle
-                    val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
-                    val startX = center.x + (radius - 30.dp.toPx()) * Math.cos(angleRad).toFloat()
-                    val startY = center.y + (radius - 30.dp.toPx()) * Math.sin(angleRad).toFloat()
-                    val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
-                    val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
-                    
-                    drawLine(
-                        color = indicatorColor,
-                        start = Offset(startX, startY),
-                        end = Offset(endX, endY),
-                        strokeWidth = 6.dp.toPx(),
-                        cap = StrokeCap.Round
+                }
+                spinnerConfig.stickResId?.let { resId ->
+                    Image(
+                        painter = painterResource(id = resId),
+                        contentDescription = "Stick",
+                        modifier = Modifier.fillMaxSize().rotate(state.currentAngle)
                     )
                 }
             }

@@ -6,6 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -60,31 +65,45 @@ fun ShopScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            ShopItem(
-                id = "DEFAULT",
-                name = "Blue 3D Dial",
-                cost = 0,
-                isUnlocked = unlockedSpinners.contains("DEFAULT"),
-                isSelected = currentSpinner == "DEFAULT",
-                onSelect = { coroutineScope.launch { viewModel.prefs.setCurrentSpinner("DEFAULT") } },
-                onUnlock = {}
-            ) { modifier ->
-                BlueDial(angle = 45f, modifier = modifier)
-            }
-            
-            ShopItem(
-                id = "MINIMALIST",
-                name = "Minimalist Neon",
-                cost = 50,
-                isUnlocked = unlockedSpinners.contains("MINIMALIST"),
-                isSelected = currentSpinner == "MINIMALIST",
-                onSelect = { coroutineScope.launch { viewModel.prefs.setCurrentSpinner("MINIMALIST") } },
-                onUnlock = { coroutineScope.launch { viewModel.prefs.unlockSpinner("MINIMALIST", 50) } }
-            ) { modifier ->
-                MinimalistDialPreview(modifier = modifier)
+            com.example.data.SpinnerProvider.spinners.forEach { config ->
+                ShopItem(
+                    id = config.id,
+                    name = config.name,
+                    cost = config.cost,
+                    isUnlocked = unlockedSpinners.contains(config.id),
+                    isSelected = currentSpinner == config.id,
+                    onSelect = { coroutineScope.launch { viewModel.prefs.setCurrentSpinner(config.id) } },
+                    onUnlock = { coroutineScope.launch { viewModel.prefs.unlockSpinner(config.id, config.cost) } }
+                ) { modifier ->
+                    if (config.isCanvasBased) {
+                        if (config.id == "DEFAULT") {
+                            BlueDial(angle = 45f, modifier = modifier)
+                        } else {
+                            MinimalistDialPreview(modifier = modifier)
+                        }
+                    } else {
+                        Box(modifier = modifier) {
+                            config.shellResId?.let { resId ->
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = "Shell",
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            config.stickResId?.let { resId ->
+                                Image(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = "Stick",
+                                    modifier = Modifier.fillMaxSize().rotate(45f)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
