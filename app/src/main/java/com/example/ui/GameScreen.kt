@@ -86,6 +86,20 @@ fun GameScreen(
                 )
             }
             
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "LEVEL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "${state.level}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
             IconButton(onClick = onLeaderboardClick) {
                 Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard", tint = MaterialTheme.colorScheme.primary)
             }

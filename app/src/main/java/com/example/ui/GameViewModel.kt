@@ -12,9 +12,11 @@ import com.example.data.Difficulty
 import com.example.data.GameRepository
 import com.example.data.GameState
 import com.example.data.PreferencesManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -34,15 +36,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = GameRepository(db.gameStateDao())
     val prefs = PreferencesManager(application)
 
-    val gameState: StateFlow<GameState?> = repository.gameState.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        null
-    )
-
     val currentDifficulty = MutableStateFlow(Difficulty.NORMAL)
     val message = MutableStateFlow<String?>(null)
     val submissionResult = MutableStateFlow<SubmissionResult?>(null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val gameState: StateFlow<GameState?> = currentDifficulty
+        .flatMapLatest { diff -> repository.getGameState(diff.ordinal) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            null
+        )
 
     init {
         viewModelScope.launch {
@@ -87,6 +92,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun submit(onWin: (Int) -> Unit, onFail: () -> Unit) {
         val state = gameState.value ?: return
         val value = abs(state.totalRotation / 360f).toInt()
+        val diff = currentDifficulty.value
 
         viewModelScope.launch {
             submissionResult.value = SubmissionResult(value, state.targetValue, value == state.targetValue)
@@ -95,13 +101,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 // Win
                 val newStreak = state.streak + 1
                 val best = maxOf(state.bestStreak, newStreak)
+                val newLevel = state.level + 1
                 val newState = state.copy(
-                    targetValue = Random.nextInt(1, state.maxValue + 1),
+                    targetValue = Random.nextInt(diff.min, diff.max + 1),
                     currentAngle = 0f,
                     totalRotation = 0f,
                     attempts = 0,
                     streak = newStreak,
-                    bestStreak = best
+                    bestStreak = best,
+                    level = newLevel
                 )
                 repository.saveGameState(newState)
                 vibrate(getApplication(), true)

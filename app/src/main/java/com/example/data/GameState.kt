@@ -12,5 +12,6 @@ data class GameState(
     val totalRotation: Float,
     val attempts: Int,
     val streak: Int,
-    val bestStreak: Int
+    val bestStreak: Int,
+    val level: Int = 1
 )
