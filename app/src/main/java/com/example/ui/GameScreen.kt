@@ -137,21 +137,29 @@ fun GameScreen(
                             val angleRad = atan2(offset.y - center.y, offset.x - center.x)
                             lastAngle = Math.toDegrees(angleRad.toDouble()).toFloat()
                         },
-                        onDrag = { change, _ ->
+                        onDrag = { change, dragAmount ->
                             change.consume()
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val pos = change.position
-                            val angleRad = atan2(pos.y - center.y, pos.x - center.x)
-                            val angleDeg = Math.toDegrees(angleRad.toDouble()).toFloat()
                             
-                            val last = lastAngle
-                            if (last != null) {
-                                var delta = angleDeg - last
-                                if (delta > 180) delta -= 360
-                                if (delta < -180) delta += 360
-                                viewModel.updateAngle(delta)
+                            val dx = pos.x - center.x
+                            val dy = pos.y - center.y
+                            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+                            
+                            if (distance > 0) {
+                                // Normalized tangent vector
+                                val tangentX = -dy / distance
+                                val tangentY = dx / distance
+                                
+                                // Project drag amount onto the tangent vector
+                                val tangentialDrag = dragAmount.x * tangentX + dragAmount.y * tangentY
+                                
+                                // Convert tangential drag to angle delta (assuming grab is at the edge of the wheel)
+                                val assumedRadius = size.width / 2f
+                                val angleDelta = (tangentialDrag / assumedRadius) * (180f / Math.PI.toFloat())
+                                
+                                viewModel.updateAngle(angleDelta)
                             }
-                            lastAngle = angleDeg
                         },
                         onDragEnd = { lastAngle = null },
                         onDragCancel = { lastAngle = null }

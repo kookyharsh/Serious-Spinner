@@ -110,6 +110,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 // Fail
                 val newState = state.copy(
+                    currentAngle = 0f,
+                    totalRotation = 0f,
                     attempts = state.attempts + 1,
                     streak = 0
                 )
@@ -124,9 +126,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun triggerTickHaptic() {
         val vibrator = getApplication<Application>().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
         } else {
-            vibrator.vibrate(10)
+            vibrator.vibrate(30)
         }
     }
 
