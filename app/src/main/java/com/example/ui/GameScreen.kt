@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,12 +29,15 @@ import kotlin.math.atan2
 fun GameScreen(
     viewModel: GameViewModel,
     onLeaderboardClick: () -> Unit,
+    onShopClick: () -> Unit,
     onWin: (Int) -> Unit
 ) {
     val gameState by viewModel.gameState.collectAsState()
     val message by viewModel.message.collectAsState()
     val currentDifficulty by viewModel.currentDifficulty.collectAsState()
     val submissionResult by viewModel.submissionResult.collectAsState()
+    val currentSpinner by viewModel.prefs.currentSpinner.collectAsState(initial = "DEFAULT")
+    val points by viewModel.prefs.points.collectAsState(initial = 0)
     
     // Add logic to clear message after a delay
     LaunchedEffect(message) {
@@ -72,7 +76,7 @@ fun GameScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "STREAK",
                     style = MaterialTheme.typography.labelSmall,
@@ -100,8 +104,27 @@ fun GameScreen(
                 )
             }
             
-            IconButton(onClick = onLeaderboardClick) {
-                Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard", tint = MaterialTheme.colorScheme.primary)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "POINTS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Text(
+                    text = "$points",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Row {
+                IconButton(onClick = onShopClick) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onLeaderboardClick) {
+                    Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard", tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
         
@@ -143,7 +166,7 @@ fun GameScreen(
         Box(
             modifier = Modifier
                 .size(250.dp)
-                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                .background(if (currentSpinner == "DEFAULT") Color.Transparent else MaterialTheme.colorScheme.surface, CircleShape)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -181,31 +204,35 @@ fun GameScreen(
                 },
             contentAlignment = Alignment.Center
         ) {
-            val indicatorColor = MaterialTheme.colorScheme.primary
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val radius = size.width / 2 - 20.dp.toPx()
-                
-                // Track
-                drawCircle(
-                    color = Color.DarkGray,
-                    radius = radius,
-                    style = Stroke(width = 4.dp.toPx())
-                )
-                
-                // Indicator line based on angle
-                val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
-                val startX = center.x + (radius - 15.dp.toPx()) * Math.cos(angleRad).toFloat()
-                val startY = center.y + (radius - 15.dp.toPx()) * Math.sin(angleRad).toFloat()
-                val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
-                val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
-                
-                drawLine(
-                    color = indicatorColor,
-                    start = Offset(startX, startY),
-                    end = Offset(endX, endY),
-                    strokeWidth = 6.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
+            if (currentSpinner == "DEFAULT") {
+                BlueDial(angle = state.currentAngle, modifier = Modifier.fillMaxSize())
+            } else {
+                val indicatorColor = MaterialTheme.colorScheme.primary
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val radius = size.width / 2 - 20.dp.toPx()
+                    
+                    // Track
+                    drawCircle(
+                        color = Color.DarkGray,
+                        radius = radius,
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                    
+                    // Indicator line based on angle
+                    val angleRad = Math.toRadians((state.currentAngle - 90).toDouble())
+                    val startX = center.x + (radius - 15.dp.toPx()) * Math.cos(angleRad).toFloat()
+                    val startY = center.y + (radius - 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                    val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
+                    val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
+                    
+                    drawLine(
+                        color = indicatorColor,
+                        start = Offset(startX, startY),
+                        end = Offset(endX, endY),
+                        strokeWidth = 6.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
             }
         }
 
@@ -266,7 +293,7 @@ fun GameScreen(
         if (message != null) {
             Text(
                 text = message!!,
-                color = if (message == "Perfect!") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                color = if (message!!.startsWith("Perfect!")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleLarge
             )

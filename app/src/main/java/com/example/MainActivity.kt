@@ -57,11 +57,20 @@ class MainActivity : ComponentActivity() {
                                 onLeaderboardClick = {
                                     playGamesManager.showLeaderboard(this@MainActivity, "CgkI_mock_leaderboard_id")
                                 },
+                                onShopClick = {
+                                    navController.navigate("shop")
+                                },
                                 onWin = { streak ->
                                     playGamesManager.submitScore(this@MainActivity, "CgkI_mock_leaderboard_id", streak.toLong())
                                     if (streak == 5) playGamesManager.unlockAchievement(this@MainActivity, "CgkI_mock_achievement_5")
                                     if (streak == 10) playGamesManager.unlockAchievement(this@MainActivity, "CgkI_mock_achievement_10")
                                 }
+                            )
+                        }
+                        composable("shop") {
+                            com.example.ui.ShopScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                     }

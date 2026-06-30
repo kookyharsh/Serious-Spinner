@@ -112,8 +112,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     level = newLevel
                 )
                 repository.saveGameState(newState)
+                
+                // Add points
+                val difficultyMultiplier = when (diff) {
+                    Difficulty.EASY -> 1
+                    Difficulty.NORMAL -> 2
+                    Difficulty.HARD -> 3
+                    Difficulty.EXTREME -> 5
+                }
+                val earnedPoints = maxOf(0, state.targetValue + state.level - state.attempts) * (1 + state.streak) * difficultyMultiplier
+                prefs.addPoints(earnedPoints)
+
                 vibrate(getApplication(), true)
-                message.value = "Perfect!"
+                message.value = "Perfect! +$earnedPoints points"
                 onWin(newStreak)
             } else {
                 // Fail
