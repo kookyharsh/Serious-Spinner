@@ -1,6 +1,8 @@
 package com.example.data
 
+import android.content.Context
 import com.example.R
+import org.json.JSONArray
 
 data class SpinnerConfig(
     val id: String,
@@ -12,7 +14,8 @@ data class SpinnerConfig(
 )
 
 object SpinnerProvider {
-    val spinners = listOf(
+    private var initialized = false
+    private val hardcodedSpinners = listOf(
         SpinnerConfig(
             id = "DEFAULT",
             name = "Blue 3D Dial",
@@ -24,24 +27,45 @@ object SpinnerProvider {
             name = "Minimalist Neon",
             cost = 50,
             isCanvasBased = true
-        ),
-        SpinnerConfig(
-            id = "RETRO",
-            name = "Retro Radar",
-            cost = 100,
-            shellResId = R.drawable.ic_radar_shell,
-            stickResId = R.drawable.ic_radar_stick
-        ),
-        SpinnerConfig(
-            id = "STEEL",
-            name = "Brushed Steel",
-            cost = 200,
-            shellResId = R.drawable.ic_steel_shell,
-            stickResId = R.drawable.ic_steel_stick
         )
     )
 
+    private val dynamicSpinners = mutableListOf<SpinnerConfig>()
+
+    val spinners: List<SpinnerConfig>
+        get() = hardcodedSpinners + dynamicSpinners
+
+    fun init(context: Context) {
+        if (initialized) return
+        initialized = true
+        dynamicSpinners.clear()
+        try {
+            val json = context.resources.openRawResource(R.raw.spinners_config)
+                .bufferedReader().use { it.readText() }
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val id = obj.getString("id")
+                val shellName = obj.optString("shell", "")
+                val stickName = obj.optString("stick", "")
+                dynamicSpinners.add(
+                    SpinnerConfig(
+                        id = id,
+                        name = obj.getString("name"),
+                        cost = obj.getInt("cost"),
+                        shellResId = context.resources.getIdentifier(shellName, "drawable", context.packageName)
+                            .takeIf { it != 0 },
+                        stickResId = context.resources.getIdentifier(stickName, "drawable", context.packageName)
+                            .takeIf { it != 0 }
+                    )
+                )
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     fun getSpinner(id: String): SpinnerConfig {
-        return spinners.find { it.id == id } ?: spinners.first()
+        val all = spinners
+        return all.find { it.id == id } ?: all.first()
     }
 }

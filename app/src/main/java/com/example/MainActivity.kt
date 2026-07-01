@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.data.SpinnerProvider
 import com.example.playgames.PlayGamesManager
 import com.example.ui.GameScreen
 import com.example.ui.GameViewModel
@@ -29,6 +30,8 @@ class MainActivity : ComponentActivity() {
         playGamesManager = PlayGamesManager(this)
         playGamesManager.signIn(this)
         playGamesManager.unlockAchievement(this, "CgkI_mock_daily_login_id")
+
+        SpinnerProvider.init(this)
 
         setContent {
             val viewModel: GameViewModel = viewModel()
@@ -62,9 +65,6 @@ class MainActivity : ComponentActivity() {
                         composable("game") {
                             GameScreen(
                                 viewModel = viewModel,
-                                onLeaderboardClick = {
-                                    playGamesManager.showLeaderboard(this@MainActivity, "CgkI_mock_leaderboard_id")
-                                },
                                 onShopClick = {
                                     navController.navigate("shop")
                                 },
@@ -72,7 +72,6 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("settings")
                                 },
                                 onWin = { streak ->
-                                    playGamesManager.submitScore(this@MainActivity, "CgkI_mock_leaderboard_id", streak.toLong())
                                     if (streak == 5) playGamesManager.unlockAchievement(this@MainActivity, "CgkI_mock_achievement_5")
                                     if (streak == 10) playGamesManager.unlockAchievement(this@MainActivity, "CgkI_mock_achievement_10")
                                 }

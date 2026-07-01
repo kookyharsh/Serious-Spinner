@@ -1,9 +1,9 @@
 package com.example.ui
 
 import android.app.Application
+import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.os.VibratorManager
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,11 +12,9 @@ import com.example.data.Difficulty
 import com.example.data.GameRepository
 import com.example.data.GameState
 import com.example.data.PreferencesManager
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -24,7 +22,7 @@ import kotlin.random.Random
 
 data class SubmissionResult(
     val submittedSpins: Int,
-    val targetSpins: Int,
+    val targetValue: Float,
     val isWin: Boolean,
     val preciseSpins: Float
 )
@@ -40,7 +38,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val currentDifficulty = MutableStateFlow(Difficulty.NORMAL)
     val message = MutableStateFlow<String?>(null)
     val submissionResult = MutableStateFlow<SubmissionResult?>(null)
-    
+
     val hapticsEnabled: StateFlow<Boolean> = prefs.hapticsEnabled.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
@@ -51,6 +49,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val gameState: StateFlow<GameState?> = _gameState
 
     private var activeJob: kotlinx.coroutines.Job? = null
+
+    private var hapticAngleAccum = 0f
 
     init {
         loadGameStateForDifficulty(currentDifficulty.value)
@@ -72,14 +72,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun updateAngle(deltaAngle: Float) {
         val state = _gameState.value ?: return
         val newTotalRotation = state.totalRotation + deltaAngle
-        
+
+        // Speed-dependent fractional haptics
+        val speed = abs(deltaAngle)
+        hapticAngleAccum += speed
+        val threshold = maxOf(6f, 40f / (1f + speed * 10f))
+        if (hapticAngleAccum >= threshold && speed > 0.1f) {
+            val amp = ((speed / 30f).coerceIn(0f, 1f) * 255).toInt().coerceAtLeast(60)
+            triggerTickHaptic(amp)
+            hapticAngleAccum = 0f
+        }
+
+        // Full-rotation heavy click
         val currentSpins = abs(state.totalRotation / 360f).toInt()
         val newSpins = abs(newTotalRotation / 360f).toInt()
-        
         if (newSpins != currentSpins) {
-            triggerTickHaptic()
+            triggerTickHaptic(255)
         }
-        
+
         _gameState.value = state.copy(
             currentAngle = (state.currentAngle + deltaAngle + 360f) % 360f,
             totalRotation = newTotalRotation
@@ -103,20 +113,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submit(onWin: (Int) -> Unit, onFail: () -> Unit) {
         val state = _gameState.value ?: return
-        val value = abs(state.totalRotation / 360f).toInt()
         val diff = currentDifficulty.value
 
         viewModelScope.launch {
             val precise = abs(state.totalRotation / 360f)
-            submissionResult.value = SubmissionResult(value, state.targetValue, value == state.targetValue, precise)
-            
-            if (value == state.targetValue) {
-                // Win
+            val submittedSpins = precise.toInt()
+
+            val tolerance = when (diff) {
+                Difficulty.EASY -> 0.3f
+                Difficulty.NORMAL -> 0.15f
+                Difficulty.HARD -> 0.08f
+                Difficulty.EXTREME -> 0.03f
+            }
+            val isWin = abs(precise - state.targetValue) <= tolerance
+
+            submissionResult.value = SubmissionResult(submittedSpins, state.targetValue, isWin, precise)
+
+            if (isWin) {
                 val newStreak = state.streak + 1
                 val best = maxOf(state.bestStreak, newStreak)
                 val newLevel = state.level + 1
                 val newState = state.copy(
-                    targetValue = Random.nextInt(diff.min, diff.max + 1),
+                    targetValue = GameRepository.generateTarget(diff, newLevel),
                     currentAngle = 0f,
                     totalRotation = 0f,
                     attempts = 0,
@@ -126,22 +144,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 _gameState.value = newState
                 repository.saveGameState(newState)
-                
-                // Add points
+
                 val difficultyMultiplier = when (diff) {
                     Difficulty.EASY -> 0.10f
                     Difficulty.NORMAL -> 0.20f
                     Difficulty.HARD -> 0.30f
                     Difficulty.EXTREME -> 0.50f
                 }
-                val earnedPoints = (maxOf(0, state.targetValue + state.level - state.attempts) * (1f + state.streak * difficultyMultiplier)).toInt()
+                val distance = abs(precise - state.targetValue)
+                val accuracy = 1f - (distance / tolerance).coerceIn(0f, 1f)
+                val accuracyMultiplier = 0.5f + accuracy * 0.5f
+                val basePoints = maxOf(0, state.targetValue.toInt() + state.level - state.attempts)
+                val earnedPoints = (basePoints * (1f + state.streak * difficultyMultiplier) * accuracyMultiplier).toInt()
                 if (earnedPoints > 0) prefs.addPoints(earnedPoints)
 
                 vibrate(getApplication(), true)
                 message.value = "Perfect!" + if (earnedPoints > 0) " +$earnedPoints points" else ""
                 onWin(newStreak)
             } else {
-                // Fail
                 val newState = state.copy(
                     currentAngle = 0f,
                     totalRotation = 0f,
@@ -157,20 +177,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun triggerTickHaptic() {
+    private fun triggerTickHaptic(amplitude: Int = 255) {
         if (!hapticsEnabled.value) return
         val vibrator = getApplication<Application>().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(12, amplitude))
         } else {
-            vibrator.vibrate(30)
+            vibrator.vibrate(12)
         }
     }
 
     private fun vibrate(context: Context, success: Boolean) {
         if (!hapticsEnabled.value) return
         val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (success) {
                 val timings = longArrayOf(0, 100, 50, 100)
                 val amplitudes = intArrayOf(0, 255, 0, 255)

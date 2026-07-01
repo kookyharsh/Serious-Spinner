@@ -18,8 +18,7 @@ class GameRepository(private val gameStateDao: GameStateDao) {
         }
         val newState = GameState(
             id = difficulty.ordinal,
-            targetValue = Random.nextInt(difficulty.min, difficulty.max + 1),
-            maxValue = difficulty.max,
+            targetValue = generateTarget(difficulty),
             currentAngle = 0f,
             totalRotation = 0f,
             attempts = 0,
@@ -29,5 +28,18 @@ class GameRepository(private val gameStateDao: GameStateDao) {
         )
         saveGameState(newState)
         return newState
+    }
+
+    companion object {
+        fun generateTarget(difficulty: Difficulty, level: Int = 1): Float {
+            val range = difficulty.max - difficulty.min
+            val maxShift = range / 2
+            val shift = ((level - 1) * maxShift / 20).coerceAtMost(maxShift)
+            val adjustedMin = difficulty.min + shift
+            if (adjustedMin >= difficulty.max) return difficulty.max.toFloat()
+            val base = Random.nextInt(adjustedMin, difficulty.max)
+            val decimal = Random.nextInt(0, 100) / 100f
+            return base + decimal
+        }
     }
 }

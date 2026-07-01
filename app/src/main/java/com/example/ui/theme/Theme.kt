@@ -1,6 +1,5 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,27 +8,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    secondary = Color(0xFFEF9A9A),
-    background = DarkBackground,
-    surface = SurfaceDark,
-    onPrimary = Color(0xFF00332E),
-    onSecondary = Color(0xFF3B0000),
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
-    tertiary = Color(0xFFB0BEC5)
+    primary = White,
+    onPrimary = Black,
+    primaryContainer = Gray800,
+    onPrimaryContainer = White,
+    secondary = Gray400,
+    onSecondary = Black,
+    secondaryContainer = Gray800,
+    onSecondaryContainer = White,
+    background = Black,
+    onBackground = White,
+    surface = Gray900,
+    onSurface = White,
+    surfaceVariant = Gray800,
+    onSurfaceVariant = Gray400,
+    outline = Gray600,
+    outlineVariant = Gray800,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryLight,
-    secondary = Color(0xFFC62828),
-    background = Color(0xFFF5F5F5),
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Color(0xFF212121),
-    onSurface = Color(0xFF212121),
-    tertiary = Color(0xFF607D8B)
+    primary = Black,
+    onPrimary = White,
+    primaryContainer = Gray200,
+    onPrimaryContainer = Black,
+    secondary = Gray600,
+    onSecondary = White,
+    secondaryContainer = Gray200,
+    onSecondaryContainer = Black,
+    background = White,
+    onBackground = Black,
+    surface = Gray50,
+    onSurface = Black,
+    surfaceVariant = Gray100,
+    onSurfaceVariant = Gray600,
+    outline = Gray400,
+    outlineVariant = Gray200,
 )
 
 @Composable

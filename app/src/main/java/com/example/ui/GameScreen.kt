@@ -1,238 +1,185 @@
 package com.example.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.Difficulty
-import kotlin.math.atan2
-import kotlinx.coroutines.launch
+import com.example.ui.theme.Gray400
+import com.example.ui.theme.Gray500
+import com.example.ui.theme.Gray600
+import com.example.ui.theme.Gray700
+import com.example.ui.theme.Gray800
+import com.example.ui.theme.Gray900
 import kotlinx.coroutines.delay
-
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.*
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
-    onLeaderboardClick: () -> Unit,
     onShopClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onWin: (Int) -> Unit
 ) {
     val gameState by viewModel.gameState.collectAsState()
-    val message by viewModel.message.collectAsState()
     val currentDifficulty by viewModel.currentDifficulty.collectAsState()
-    val submissionResult by viewModel.submissionResult.collectAsState()
     val currentSpinner by viewModel.prefs.currentSpinner.collectAsState(initial = "DEFAULT")
     val points by viewModel.prefs.points.collectAsState(initial = 0)
 
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
     var isSpinning by remember { mutableStateOf(false) }
-    
+
     var lastDragTime by remember { mutableStateOf(0L) }
     var dragVelocity by remember { mutableStateOf(0f) }
     var inertiaJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-    
+
     val wobbleAnim = remember { Animatable(0f) }
-    val rippleAnim = remember { Animatable(0f) }
-    val animatedScore = remember { Animatable(0f) }
-    
-    // Add logic to clear message after a delay
+
+    val message by viewModel.message.collectAsState()
+    val submissionResult by viewModel.submissionResult.collectAsState()
+
     LaunchedEffect(message) {
         if (message != null) {
-            kotlinx.coroutines.delay(2000)
+            delay(2000)
             viewModel.clearMessage()
         }
     }
-    
+
     LaunchedEffect(submissionResult) {
         if (submissionResult != null) {
-            val result = submissionResult!!
-            val currentSpins = result.preciseSpins
-            val targetSpins = result.targetSpins.toFloat()
-            val diffSpins = abs(currentSpins - targetSpins)
-            val score = maxOf(0f, (1f - diffSpins) * 100f)
-            
-            animatedScore.snapTo(0f)
-            launch {
-                animatedScore.animateTo(
-                    targetValue = score,
-                    animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing)
-                )
-            }
-            
             delay(4000)
             viewModel.clearSubmissionResult()
-        } else {
-            animatedScore.snapTo(0f)
-        }
-    }
-
-    val currentSpinsCount = abs((gameState?.totalRotation ?: 0f) / 360f).toInt()
-    LaunchedEffect(currentSpinsCount) {
-        if (currentSpinsCount != 0) {
-            rippleAnim.snapTo(0f)
-            rippleAnim.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 350, easing = LinearOutSlowInEasing)
-            )
         }
     }
 
     if (gameState == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = Color.White)
         }
         return
     }
 
     val state = gameState!!
 
+    val hasSpunMoreThanOnce = abs(state.totalRotation) >= 360f
+
     val bottomDeckAlpha by animateFloatAsState(
-        targetValue = if (isDragging || isSpinning) 0f else 1f,
+        targetValue = if (isDragging || isSpinning || submissionResult != null) 0f else 1f,
         animationSpec = tween(durationMillis = 250),
         label = "BottomDeckAlpha"
     )
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .padding(bottom = 80.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-        // Header (Streak and Difficulty)
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "STREAK",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Text(
-                    text = "${state.streak}",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "LEVEL",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "${state.level}",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "POINTS",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                Text(
-                    text = "$points",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Row {
-                IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onShopClick) {
-                    Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onLeaderboardClick) {
-                    Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard", tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Text(
-            text = "TARGET",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            letterSpacing = 2.sp
-        )
-        Text(
-            text = "${state.targetValue}",
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-            Difficulty.values().forEach { diff ->
-                TextButton(
-                    onClick = { viewModel.setDifficulty(diff) },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (currentDifficulty == diff) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
+            Text(
+                text = "SERIOUS SPINNER",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .clickable { onShopClick() }
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(diff.name)
+                    Text(
+                        text = "$points",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Gray400
+                    )
+                    Text(
+                        text = " pts",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Gray600,
+                        modifier = Modifier.padding(start = 2.dp)
+                    )
+                }
+
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Gray400
+                    )
                 }
             }
         }
+
+        HorizontalDivider(color = Gray800, thickness = 1.dp)
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Minimalist Dial
+        // Target
+        Text(
+            text = "target",
+            style = MaterialTheme.typography.labelLarge,
+            color = Gray600,
+            letterSpacing = 2.sp
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "${state.targetValue}",
+            style = MaterialTheme.typography.displayLarge,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // Spinner Dial
         var lastAngle by remember { mutableStateOf<Float?>(null) }
         val spinnerConfig = com.example.data.SpinnerProvider.getSpinner(currentSpinner)
         val displayedAngle = state.currentAngle + wobbleAnim.value
@@ -240,7 +187,7 @@ fun GameScreen(
         val handleDragRelease = {
             isDragging = false
             lastAngle = null
-            
+
             if (abs(dragVelocity) > 0.05f) {
                 inertiaJob = coroutineScope.launch {
                     isSpinning = true
@@ -254,16 +201,10 @@ fun GameScreen(
                         val deltaAngle = velocity * dt
                         viewModel.updateAngle(deltaAngle)
                         velocity *= friction
-                        
-                        try {
-                            androidx.compose.runtime.withFrameMillis { }
-                        } catch (e: Exception) {
-                            kotlinx.coroutines.delay(16)
-                        }
+                        delay(16)
                     }
                     isSpinning = false
                     viewModel.saveCurrentStateToDb()
-                    
                     wobbleAnim.snapTo(if (dragVelocity > 0) 6f else -6f)
                     wobbleAnim.animateTo(
                         targetValue = 0f,
@@ -274,8 +215,8 @@ fun GameScreen(
                     )
                 }
             } else {
-                viewModel.saveCurrentStateToDb()
                 coroutineScope.launch {
+                    viewModel.saveCurrentStateToDb()
                     wobbleAnim.snapTo(if (state.totalRotation > 0) 2.5f else -2.5f)
                     wobbleAnim.animateTo(
                         targetValue = 0f,
@@ -290,8 +231,7 @@ fun GameScreen(
 
         Box(
             modifier = Modifier
-                .size(250.dp)
-                .background(if (spinnerConfig.isCanvasBased && currentSpinner != "DEFAULT") MaterialTheme.colorScheme.surface else Color.Transparent, CircleShape)
+                .size(220.dp)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -309,32 +249,22 @@ fun GameScreen(
                             change.consume()
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val pos = change.position
-                            
                             val dx = pos.x - center.x
                             val dy = pos.y - center.y
-                            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
-                            
+                            val distance = sqrt(dx * dx + dy * dy)
                             if (distance > 0) {
                                 val currentAngleRad = atan2(dy, dx)
                                 val currentAngleDeg = Math.toDegrees(currentAngleRad.toDouble()).toFloat()
                                 val prevAngle = lastAngle ?: currentAngleDeg
                                 var angleDelta = currentAngleDeg - prevAngle
-                                
                                 while (angleDelta > 180f) angleDelta -= 360f
                                 while (angleDelta < -180f) angleDelta += 360f
-                                
                                 viewModel.updateAngle(angleDelta)
                                 lastAngle = currentAngleDeg
-                                
                                 val now = System.currentTimeMillis()
                                 val dt = now - lastDragTime
                                 if (dt > 0) {
-                                    val instantVelocity = angleDelta / dt
-                                    dragVelocity = if (abs(dragVelocity) < 0.001f) {
-                                        instantVelocity
-                                    } else {
-                                        dragVelocity * 0.6f + instantVelocity * 0.4f
-                                    }
+                                    dragVelocity = (dragVelocity * 0.6f) + ((angleDelta / dt) * 0.4f)
                                 }
                                 lastDragTime = now
                             }
@@ -345,52 +275,11 @@ fun GameScreen(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Ripple visualizer layer
-            if (rippleAnim.value > 0f && rippleAnim.value < 1f) {
-                val indicatorColor = MaterialTheme.colorScheme.primary
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val startRadius = size.width / 2f
-                    val maxRadius = startRadius + 60.dp.toPx()
-                    val currentRadius = startRadius + (maxRadius - startRadius) * rippleAnim.value
-                    val alpha = 1f - rippleAnim.value
-                    drawCircle(
-                        color = indicatorColor.copy(alpha = alpha * 0.45f),
-                        radius = currentRadius,
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-            }
-
             if (spinnerConfig.isCanvasBased) {
                 if (currentSpinner == "DEFAULT") {
                     BlueDial(angle = displayedAngle, modifier = Modifier.fillMaxSize())
                 } else {
-                    val indicatorColor = MaterialTheme.colorScheme.primary
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val radius = size.width / 2 - 20.dp.toPx()
-                        
-                        // Track
-                        drawCircle(
-                            color = Color.DarkGray,
-                            radius = radius,
-                            style = Stroke(width = 4.dp.toPx())
-                        )
-                        
-                        // Indicator line based on angle
-                        val angleRad = Math.toRadians((displayedAngle - 90).toDouble())
-                        val startX = center.x + (radius - 30.dp.toPx()) * Math.cos(angleRad).toFloat()
-                        val startY = center.y + (radius - 30.dp.toPx()) * Math.sin(angleRad).toFloat()
-                        val endX = center.x + (radius + 15.dp.toPx()) * Math.cos(angleRad).toFloat()
-                        val endY = center.y + (radius + 15.dp.toPx()) * Math.sin(angleRad).toFloat()
-                        
-                        drawLine(
-                            color = indicatorColor,
-                            start = Offset(startX, startY),
-                            end = Offset(endX, endY),
-                            strokeWidth = 6.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                    }
+                    MinimalDial(angle = displayedAngle, modifier = Modifier.fillMaxSize())
                 }
             } else {
                 spinnerConfig.shellResId?.let { resId ->
@@ -410,177 +299,221 @@ fun GameScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
+        // Attempts
         Text(
-            text = "Attempts: ${state.attempts}",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            text = "attempts  ${state.attempts}",
+            style = MaterialTheme.typography.labelLarge,
+            color = Gray600,
+            letterSpacing = 1.sp
         )
-        
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Streak and Level
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "streak",
+                style = MaterialTheme.typography.labelLarge,
+                color = Gray600,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "${state.streak}",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.width(32.dp))
+
+            Text(
+                text = "level",
+                style = MaterialTheme.typography.labelLarge,
+                color = Gray600,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "${state.level}",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Precision Score
         AnimatedVisibility(
             visible = submissionResult != null,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
-            val result = submissionResult ?: return@AnimatedVisibility
-            val currentSpins = result.preciseSpins
-            val targetSpins = result.targetSpins.toFloat()
-            val diffSpins = abs(currentSpins - targetSpins)
-            val precisionScore = maxOf(0f, (1f - diffSpins) * 100f)
+            submissionResult?.let { result ->
+                val currentSpins = result.preciseSpins
+                val targetValue = result.targetValue
+                val diffSpins = abs(currentSpins - targetValue)
+                val precisionScore = maxOf(0f, (1f - diffSpins) * 100f)
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .testTag("precision_score_card"),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                ),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                )
-            ) {
+                val scoreText = when {
+                    precisionScore >= 99f -> "flawless"
+                    precisionScore >= 95f -> "excellent"
+                    precisionScore >= 90f -> "very close"
+                    precisionScore >= 75f -> "on the right track"
+                    else -> "keep adjusting"
+                }
+
                 Column(
                     modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .border(1.dp, Gray700, RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Gray900)
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Precision Score",
+                        text = "precision score",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        letterSpacing = 1.5.sp,
+                        color = Gray500,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = String.format("%.1f%%", precisionScore),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    val scoreColor = when {
-                        precisionScore >= 95f -> MaterialTheme.colorScheme.primary
-                        precisionScore >= 80f -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.error
-                    }
-                    
-                    val scoreText = when {
-                        precisionScore >= 99f -> "Flawless!"
-                        precisionScore >= 95f -> "Excellent!"
-                        precisionScore >= 90f -> "Very Close!"
-                        precisionScore >= 75f -> "On the right track"
-                        else -> "Keep adjusting!"
-                    }
-                    
-                    Text(
-                        text = String.format("%.1f%%", animatedScore.value),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = scoreColor,
-                        fontWeight = FontWeight.Black
-                    )
-                    
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     Text(
                         text = scoreText,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = scoreColor.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.SemiBold
+                        color = Gray400
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Subtitle with details
+
                     Text(
-                        text = "You spun ${String.format("%.2f", currentSpins)} / ${result.targetSpins}.00 spins",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "you spun ${String.format("%.2f", currentSpins)} / ${String.format("%.2f", targetValue)} spins",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Gray500
                     )
-                    
-                    val diffFormatted = if (currentSpins < targetSpins) {
+
+                    val diffFormatted = if (currentSpins < targetValue) {
                         String.format("-%.2f spins needed", diffSpins)
                     } else {
                         String.format("+%.2f spins over", diffSpins)
                     }
-                    
+
                     Text(
-                        text = if (diffSpins == 0f) "Perfect match!" else diffFormatted,
+                        text = if (diffSpins == 0f) "perfect match" else diffFormatted,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (diffSpins == 0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        color = if (diffSpins == 0f) Gray400 else Gray600
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-        
-        if (message != null) {
-            Text(
-                text = message!!,
-                color = if (message!!.startsWith("Perfect!")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
+        Spacer(modifier = Modifier.height(8.dp))
 
-    // FLOATING BOTTOM ACTION DECK
-    Surface(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .fillMaxWidth()
-            .height(64.dp)
-            .graphicsLayer { 
-                alpha = bottomDeckAlpha
-                translationY = (1f - bottomDeckAlpha) * 50f
-            },
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // Win/Loss Message
+        AnimatedVisibility(
+            visible = message != null,
+            enter = fadeIn(),
+            exit = fadeOut()
         ) {
-            TextButton(
-                onClick = { 
-                    viewModel.updateAngle(-state.totalRotation) 
-                    viewModel.saveCurrentStateToDb()
-                },
-                enabled = !isDragging && !isSpinning && state.totalRotation != 0f
-            ) {
+            message?.let { msg ->
                 Text(
-                    text = "RESET",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (state.totalRotation != 0f) 0.8f else 0.4f)
-                )
-            }
-
-            Button(
-                onClick = { viewModel.submit(onWin = onWin, onFail = {}) },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp)
-                    .height(44.dp)
-                    .testTag("submit_button"),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                shape = RoundedCornerShape(22.dp),
-                enabled = !isDragging && !isSpinning
-            ) {
-                Text(
-                    text = "SUBMIT",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+                    text = msg,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (msg.startsWith("Perfect")) Color.White else Gray500,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Difficulty Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Difficulty.values().forEach { diff ->
+                val displayName = when (diff) {
+                    Difficulty.EASY -> "easy"
+                    Difficulty.NORMAL -> "medium"
+                    Difficulty.HARD -> "hard"
+                    Difficulty.EXTREME -> "extreme"
+                }
+                val isSelected = currentDifficulty == diff
+                Surface(
+                    onClick = { viewModel.setDifficulty(diff) },
+                    modifier = Modifier.weight(1f),
+                    color = Color.Transparent,
+                    shape = RoundedCornerShape(100)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) Color.White else Gray600,
+                                shape = RoundedCornerShape(100)
+                            )
+                            .background(
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(100)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = displayName,
+                            color = if (isSelected) Color.Black else Gray400,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Submit Button
+        Button(
+            onClick = { viewModel.submit(onWin = onWin, onFail = {}) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .graphicsLayer { alpha = bottomDeckAlpha },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color.Black
+            ),
+            shape = RoundedCornerShape(100),
+            enabled = hasSpunMoreThanOnce && !isDragging && !isSpinning
+        ) {
+            Text(
+                text = "submit",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
-}
 }

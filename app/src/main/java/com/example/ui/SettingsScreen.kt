@@ -1,13 +1,20 @@
 package com.example.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.Gray400
+import com.example.ui.theme.Gray600
+import com.example.ui.theme.Gray800
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,10 +30,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -55,11 +62,17 @@ fun SettingsScreen(
                         coroutineScope.launch {
                             viewModel.prefs.setHapticsEnabled(isChecked)
                         }
-                    }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Gray600,
+                        uncheckedThumbColor = Gray600,
+                        uncheckedTrackColor = Gray800
+                    )
                 )
             }
 
-            Divider()
+            HorizontalDivider(color = Gray800, thickness = 1.dp)
 
             // Theme Selection
             Column {
@@ -70,7 +83,7 @@ fun SettingsScreen(
                 )
 
                 val themeOptions = listOf("System Default", "Light", "Dark")
-                
+
                 themeOptions.forEachIndexed { index, option ->
                     Row(
                         modifier = Modifier
@@ -84,7 +97,11 @@ fun SettingsScreen(
                                 coroutineScope.launch {
                                     viewModel.prefs.setThemeMode(index)
                                 }
-                            }
+                            },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Color.White,
+                                unselectedColor = Gray600
+                            )
                         )
                         Text(
                             text = option,

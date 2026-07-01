@@ -1,0 +1,4 @@
+[
+  { "id": "RETRO", "name": "Retro Radar", "cost": 100, "shell": "ic_radar_shell", "stick": "ic_radar_stick" },
+  { "id": "STEEL", "name": "Brushed Steel", "cost": 200, "shell": "ic_steel_shell", "stick": "ic_steel_stick" }
+]
