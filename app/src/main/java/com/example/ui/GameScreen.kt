@@ -262,6 +262,7 @@ fun GameScreen(
                         }
                     }
                     isSpinning = false
+                    viewModel.saveCurrentStateToDb()
                     
                     wobbleAnim.snapTo(if (dragVelocity > 0) 6f else -6f)
                     wobbleAnim.animateTo(
@@ -273,6 +274,7 @@ fun GameScreen(
                     )
                 }
             } else {
+                viewModel.saveCurrentStateToDb()
                 coroutineScope.launch {
                     wobbleAnim.snapTo(if (state.totalRotation > 0) 2.5f else -2.5f)
                     wobbleAnim.animateTo(
@@ -550,6 +552,7 @@ fun GameScreen(
             TextButton(
                 onClick = { 
                     viewModel.updateAngle(-state.totalRotation) 
+                    viewModel.saveCurrentStateToDb()
                 },
                 enabled = !isDragging && !isSpinning && state.totalRotation != 0f
             ) {

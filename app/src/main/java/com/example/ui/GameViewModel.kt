@@ -47,30 +47,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         true
     )
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val gameState: StateFlow<GameState?> = currentDifficulty
-        .flatMapLatest { diff -> repository.getGameState(diff.ordinal) }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            null
-        )
+    private val _gameState = MutableStateFlow<GameState?>(null)
+    val gameState: StateFlow<GameState?> = _gameState
+
+    private var activeJob: kotlinx.coroutines.Job? = null
 
     init {
-        viewModelScope.launch {
-            repository.initOrGetState(currentDifficulty.value)
+        loadGameStateForDifficulty(currentDifficulty.value)
+    }
+
+    private fun loadGameStateForDifficulty(difficulty: Difficulty) {
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            val state = repository.initOrGetState(difficulty)
+            _gameState.value = state
         }
     }
 
     fun setDifficulty(difficulty: Difficulty) {
         currentDifficulty.value = difficulty
-        viewModelScope.launch {
-            repository.initOrGetState(difficulty)
-        }
+        loadGameStateForDifficulty(difficulty)
     }
 
     fun updateAngle(deltaAngle: Float) {
-        val state = gameState.value ?: return
+        val state = _gameState.value ?: return
         val newTotalRotation = state.totalRotation + deltaAngle
         
         val currentSpins = abs(state.totalRotation / 360f).toInt()
@@ -80,11 +80,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             triggerTickHaptic()
         }
         
+        _gameState.value = state.copy(
+            currentAngle = (state.currentAngle + deltaAngle + 360f) % 360f,
+            totalRotation = newTotalRotation
+        )
+    }
+
+    fun saveCurrentStateToDb() {
+        val state = _gameState.value ?: return
         viewModelScope.launch {
-            repository.saveGameState(state.copy(
-                currentAngle = (state.currentAngle + deltaAngle + 360f) % 360f,
-                totalRotation = newTotalRotation
-            ))
+            repository.saveGameState(state)
         }
     }
 
@@ -97,7 +102,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun submit(onWin: (Int) -> Unit, onFail: () -> Unit) {
-        val state = gameState.value ?: return
+        val state = _gameState.value ?: return
         val value = abs(state.totalRotation / 360f).toInt()
         val diff = currentDifficulty.value
 
@@ -119,6 +124,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     bestStreak = best,
                     level = newLevel
                 )
+                _gameState.value = newState
                 repository.saveGameState(newState)
                 
                 // Add points
@@ -142,6 +148,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     attempts = state.attempts + 1,
                     streak = 0
                 )
+                _gameState.value = newState
                 repository.saveGameState(newState)
                 vibrate(getApplication(), false)
                 message.value = "Incorrect. Try again."
