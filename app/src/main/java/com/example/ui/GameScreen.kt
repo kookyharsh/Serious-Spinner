@@ -305,7 +305,7 @@ fun GameScreen(
                             lastDragTime = System.currentTimeMillis()
                             dragVelocity = 0f
                         },
-                        onDrag = { change, dragAmount ->
+                        onDrag = { change, _ ->
                             change.consume()
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val pos = change.position
@@ -315,18 +315,16 @@ fun GameScreen(
                             val distance = kotlin.math.sqrt(dx * dx + dy * dy)
                             
                             if (distance > 0) {
-                                // Normalized tangent vector
-                                val tangentX = -dy / distance
-                                val tangentY = dx / distance
+                                val currentAngleRad = atan2(dy, dx)
+                                val currentAngleDeg = Math.toDegrees(currentAngleRad.toDouble()).toFloat()
+                                val prevAngle = lastAngle ?: currentAngleDeg
+                                var angleDelta = currentAngleDeg - prevAngle
                                 
-                                // Project drag amount onto the tangent vector
-                                val tangentialDrag = dragAmount.x * tangentX + dragAmount.y * tangentY
-                                
-                                // Convert tangential drag to angle delta (assuming grab is at the edge of the wheel)
-                                val assumedRadius = size.width / 2f
-                                val angleDelta = (tangentialDrag / assumedRadius) * (180f / Math.PI.toFloat())
+                                while (angleDelta > 180f) angleDelta -= 360f
+                                while (angleDelta < -180f) angleDelta += 360f
                                 
                                 viewModel.updateAngle(angleDelta)
+                                lastAngle = currentAngleDeg
                                 
                                 val now = System.currentTimeMillis()
                                 val dt = now - lastDragTime
