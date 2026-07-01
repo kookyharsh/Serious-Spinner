@@ -25,7 +25,8 @@ import kotlin.random.Random
 data class SubmissionResult(
     val submittedSpins: Int,
     val targetSpins: Int,
-    val isWin: Boolean
+    val isWin: Boolean,
+    val preciseSpins: Float
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -101,7 +102,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val diff = currentDifficulty.value
 
         viewModelScope.launch {
-            submissionResult.value = SubmissionResult(value, state.targetValue, value == state.targetValue)
+            val precise = abs(state.totalRotation / 360f)
+            submissionResult.value = SubmissionResult(value, state.targetValue, value == state.targetValue, precise)
             
             if (value == state.targetValue) {
                 // Win

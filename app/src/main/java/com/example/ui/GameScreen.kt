@@ -28,6 +28,17 @@ import androidx.compose.ui.unit.sp
 import com.example.data.Difficulty
 import kotlin.math.atan2
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import kotlin.math.abs
+
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
@@ -169,6 +180,7 @@ fun GameScreen(
 
         // Minimalist Dial
         var lastAngle by remember { mutableStateOf<Float?>(null) }
+        var isDragging by remember { mutableStateOf(false) }
 
         val spinnerConfig = com.example.data.SpinnerProvider.getSpinner(currentSpinner)
         Box(
@@ -178,6 +190,9 @@ fun GameScreen(
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
+                            isDragging = true
+                            viewModel.clearSubmissionResult()
+                            viewModel.clearMessage()
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val angleRad = atan2(offset.y - center.y, offset.x - center.x)
                             lastAngle = Math.toDegrees(angleRad.toDouble()).toFloat()
@@ -206,8 +221,14 @@ fun GameScreen(
                                 viewModel.updateAngle(angleDelta)
                             }
                         },
-                        onDragEnd = { lastAngle = null },
-                        onDragCancel = { lastAngle = null }
+                        onDragEnd = { 
+                            lastAngle = null
+                            isDragging = false
+                        },
+                        onDragCancel = { 
+                            lastAngle = null
+                            isDragging = false
+                        }
                     )
                 },
             contentAlignment = Alignment.Center
@@ -269,46 +290,95 @@ fun GameScreen(
             color = MaterialTheme.colorScheme.onSurface
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        AnimatedVisibility(
+            visible = submissionResult != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            val result = submissionResult ?: return@AnimatedVisibility
+            val currentSpins = result.preciseSpins
+            val targetSpins = result.targetSpins.toFloat()
+            val diffSpins = abs(currentSpins - targetSpins)
+            val precisionScore = maxOf(0f, (1f - diffSpins) * 100f)
 
-        if (submissionResult != null) {
-            val result = submissionResult!!
-            var animationPlayed by remember { mutableStateOf(false) }
-            
-            LaunchedEffect(result) {
-                animationPlayed = true
-            }
-
-            val maxSpins = maxOf(result.targetSpins, result.submittedSpins).toFloat()
-            val targetRatio = if (maxSpins > 0) result.targetSpins / maxSpins else 0f
-            val submittedRatio = if (maxSpins > 0) result.submittedSpins / maxSpins else 0f
-            
-            val animatedSubmittedRatio by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (animationPlayed) submittedRatio else 0f,
-                animationSpec = androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)) {
-                Text(
-                    text = "Spins: ${result.submittedSpins} / ${result.targetSpins}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .testTag("precision_score_card"),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(16.dp)) {
-                    // Background
-                    Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray, CircleShape))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Precision Score",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     
-                    // Submitted Bar
-                    Box(modifier = Modifier.fillMaxWidth(animatedSubmittedRatio).fillMaxHeight().background(
-                        if (result.isWin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        CircleShape
-                    ))
+                    Spacer(modifier = Modifier.height(4.dp))
                     
-                    // Target Marker
-                    Box(modifier = Modifier.fillMaxWidth(targetRatio).fillMaxHeight(), contentAlignment = Alignment.CenterEnd) {
-                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(Color.White))
+                    val scoreColor = when {
+                        precisionScore >= 95f -> MaterialTheme.colorScheme.primary
+                        precisionScore >= 80f -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.error
                     }
+                    
+                    val scoreText = when {
+                        precisionScore >= 99f -> "Flawless!"
+                        precisionScore >= 95f -> "Excellent!"
+                        precisionScore >= 90f -> "Very Close!"
+                        precisionScore >= 75f -> "On the right track"
+                        else -> "Keep adjusting!"
+                    }
+                    
+                    Text(
+                        text = String.format("%.1f%%", precisionScore),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = scoreColor,
+                        fontWeight = FontWeight.Black
+                    )
+                    
+                    Text(
+                        text = scoreText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scoreColor.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Subtitle with details
+                    Text(
+                        text = "You spun ${String.format("%.2f", currentSpins)} / ${result.targetSpins}.00 spins",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    val diffFormatted = if (currentSpins < targetSpins) {
+                        String.format("-%.2f spins needed", diffSpins)
+                    } else {
+                        String.format("+%.2f spins over", diffSpins)
+                    }
+                    
+                    Text(
+                        text = if (diffSpins == 0f) "Perfect match!" else diffFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (diffSpins == 0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
